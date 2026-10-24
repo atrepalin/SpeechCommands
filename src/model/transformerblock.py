@@ -16,6 +16,7 @@ class TransformerBlock(nn.Module):
 
         self.norm2 = nn.LayerNorm(dim)
 
+        # FF layer
         self.ffn = nn.Sequential(
             nn.Linear(dim, ff_dim),
             nn.LeakyReLU(),
@@ -26,10 +27,12 @@ class TransformerBlock(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Residual connection
         residual = x
 
         x = self.norm1(x)
 
+        # K, Q, V matrices are identical
         attn_out, _ = self.attention(x, x, x)
 
         x = residual + self.dropout1(attn_out)

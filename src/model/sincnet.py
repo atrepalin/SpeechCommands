@@ -31,7 +31,7 @@ class SincResNetKWS(nn.Module):
                             stride=10,
                             normalize=False,
                         ),
-                    ),
+                    ),  # Sinc based frontend
                     (
                         "stem",
                         nn.Sequential(
@@ -39,7 +39,7 @@ class SincResNetKWS(nn.Module):
                             nn.BatchNorm1d(128),
                             nn.LeakyReLU(),
                         ),
-                    ),
+                    ),  # Initial feature extraction
                     (
                         "stage1",
                         nn.Sequential(
@@ -74,7 +74,10 @@ class SincResNetKWS(nn.Module):
                             ResBlock1D(256, dilation=4, dropout=0.05),
                         ),
                     ),
-                    ("pool", AttentionPooling1D(channels=256, attention_channels=128)),
+                    (
+                        "pool",
+                        AttentionPooling1D(channels=256, attention_channels=128),
+                    ),  # Attention pooling
                 ]
             )
         )

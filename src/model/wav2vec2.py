@@ -11,6 +11,7 @@ class Wav2Vec2KWS(nn.Module):
     def __init__(self, num_classes: int):
         super().__init__()
 
+        # Use multi-scale feature encoder
         self.feature_encoder = FeatureEncoder(
             [
                 FeatureEncoderLayer(512, 10, 5),
@@ -23,8 +24,10 @@ class Wav2Vec2KWS(nn.Module):
             ]
         )
 
+        # Project features
         self.feature_projection = FeatureProjection(input_dim=512, hidden_dim=384)
 
+        # Add positional embedding
         self.positional_embedding = PositionalEmbedding(
             dim=384, kernel_size=128, groups=16
         )
@@ -40,10 +43,12 @@ class Wav2Vec2KWS(nn.Module):
 
         x = self.feature_projection(x)
 
+        # Add positional embedding
         x = x + self.positional_embedding(x)
 
         x = self.transformer(x)
 
+        # Global average pooling
         x = x.mean(dim=1)
 
         logits = self.classifier(x)

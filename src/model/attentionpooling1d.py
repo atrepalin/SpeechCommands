@@ -9,6 +9,7 @@ class AttentionPooling1D(nn.Module):
         if attention_channels is None:
             attention_channels = channels // 2
 
+        # Standard attention pooling implementation
         self.attention = nn.Sequential(
             nn.Conv1d(channels, attention_channels, kernel_size=1),
             nn.Tanh(),

@@ -6,6 +6,8 @@ import torch.nn as nn
 
 @dataclass
 class FeatureEncoderLayer:
+    """A layer of a feature encoder"""
+
     out_channels: int
     kernel_size: int
     stride: int

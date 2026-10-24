@@ -8,6 +8,7 @@ class TransformerEncoder(nn.Module):
     def __init__(self, dim=384, num_layers=6, num_heads=6, ff_dim=1536, dropout=0.1):
         super().__init__()
 
+        # Transformer based encoder
         self.layers = nn.Sequential(
             *[
                 TransformerBlock(

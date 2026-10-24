@@ -18,6 +18,7 @@ class ResBlock2D(nn.Module):
         self.bn1 = nn.BatchNorm2d(in_channels)
         self.act1 = nn.LeakyReLU()
 
+        # For mel 2d processing we use 3x3 convolutions without dilation
         self.conv1 = nn.Conv2d(
             in_channels,
             out_channels,
@@ -43,6 +44,7 @@ class ResBlock2D(nn.Module):
 
         self.se = SEBlock2D(out_channels, reduction=reduction)
 
+        # Shortcut connection if channels mismatch or stride > 1
         self.shortcut = (
             nn.Identity()
             if in_channels == out_channels and stride == 1

@@ -15,11 +15,14 @@ class ResBlock1D(nn.Module):
         super().__init__()
 
         kernel_size = 5
+
+        # Calculate padding to obtain same output shape
         padding = ((kernel_size - 1) // 2) * dilation
 
         self.bn1 = nn.BatchNorm1d(channels)
         self.act1 = nn.LeakyReLU()
 
+        # For audio 1d processing we use dilated convolutions to capture long-range dependencies
         self.conv1 = nn.Conv1d(
             channels,
             channels,

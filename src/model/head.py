@@ -3,6 +3,8 @@ import torch.nn as nn
 
 
 class ClassificationHead(nn.Module):
+    """Same head for MelResNet and SincNet"""
+
     def __init__(
         self,
         num_classes: int,

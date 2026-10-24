@@ -9,6 +9,7 @@ class PositionalEmbedding(nn.Module):
 
         self.kernel_size = kernel_size
 
+        # wav2vec uses 1d conv as a positional embedding layer instead of sine/cosine encoding
         self.conv = nn.Conv1d(
             dim, dim, kernel_size=kernel_size, padding=0, groups=groups
         )
@@ -20,9 +21,9 @@ class PositionalEmbedding(nn.Module):
 
         x = x.transpose(1, 2)
 
+        # Use symmetric padding
         left = self.kernel_size // 2
         right = self.kernel_size - 1 - left
-
         x = F.pad(x, (left, right))
 
         x = self.conv(x)

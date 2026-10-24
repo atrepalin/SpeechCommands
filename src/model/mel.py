@@ -11,6 +11,8 @@ from src.model.res.resblock2d import ResBlock2D
 
 
 class SpecNormalize(nn.Module):
+    """Normalizes the input spectrogram"""
+
     def __init__(self, eps: float = 1e-5):
         super().__init__()
         self.eps = eps
@@ -23,6 +25,8 @@ class SpecNormalize(nn.Module):
 
 
 class Unsqueeze(nn.Module):
+    """Unsqueezes the input tensor"""
+
     def __init__(self, dim):
         super().__init__()
         self.dim = dim
@@ -32,6 +36,8 @@ class Unsqueeze(nn.Module):
 
 
 class Squeeze(nn.Module):
+    """Squeezes the input tensor"""
+
     def __init__(self, dim):
         super().__init__()
         self.dim = dim
@@ -41,10 +47,13 @@ class Squeeze(nn.Module):
 
 
 class InputPreprocess(nn.Module):
+    """Preprocesses the input tensor"""
+
     def __init__(self):
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Preprocess input as MelSpectrogram requires a 2d tensor
         if x.dim() == 3:
             x = x.squeeze(1)
 
@@ -61,7 +70,7 @@ class MelResNetKWS(nn.Module):
         self.backbone = nn.Sequential(
             OrderedDict(
                 [
-                    ("preprocess", InputPreprocess()),
+                    ("preprocess", InputPreprocess()),  # Needed for MelSpectrogram
                     (
                         "mel",
                         torchaudio.transforms.MelSpectrogram(
@@ -74,13 +83,13 @@ class MelResNetKWS(nn.Module):
                             f_max=16000 // 2,
                             power=2.0,
                         ),
-                    ),
+                    ),  # Calculates Mel Spectrogram
                     (
                         "db",
                         torchaudio.transforms.AmplitudeToDB(stype="power", top_db=80),
-                    ),
-                    ("norm", SpecNormalize()),
-                    ("unsqueeze", Unsqueeze(1)),
+                    ),  # Converts to decibels
+                    ("norm", SpecNormalize()),  # Normalizes spectrogram
+                    ("unsqueeze", Unsqueeze(1)),  # Unsqueezes spectrogram for ResNet
                     (
                         "stem",
                         nn.Sequential(
@@ -88,7 +97,7 @@ class MelResNetKWS(nn.Module):
                             nn.BatchNorm2d(64),
                             nn.LeakyReLU(),
                         ),
-                    ),
+                    ),  # Initial feature extraction
                     (
                         "stage1",
                         nn.Sequential(
@@ -118,9 +127,12 @@ class MelResNetKWS(nn.Module):
                             ResBlock2D(256, 256, dropout=0.05),
                         ),
                     ),
-                    ("freq_pool", nn.AdaptiveAvgPool2d((1, None))),
-                    ("squeeze", Squeeze(2)),
-                    ("pool", AttentionPooling1D(channels=256, attention_channels=128)),
+                    ("freq_pool", nn.AdaptiveAvgPool2d((1, None))),  # Frequency pooling
+                    ("squeeze", Squeeze(2)),  # Squeezes frequency dimension to [B, 256]
+                    (
+                        "pool",
+                        AttentionPooling1D(channels=256, attention_channels=128),
+                    ),  # Attention pooling
                 ]
             )
         )
