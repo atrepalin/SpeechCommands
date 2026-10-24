@@ -222,3 +222,4 @@ __marimo__/
 *.pt
 train
 test
+*.csv

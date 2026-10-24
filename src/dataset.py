@@ -1,6 +1,7 @@
 import json
 import random
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import soundfile as sf
@@ -39,8 +40,9 @@ class SpeechCommandsDataset(Dataset):
         max_samples: int | None = None,
         add_silence: bool = True,
         skip_anomalies: bool = False,
+        dataset_format: str = "auto",
     ):
-        self.audio_dir = audio_dir
+        self.audio_dir = Path(audio_dir)
         self.split = split
         self.validation_files = validation_files
         self.test_files = test_files
@@ -48,10 +50,53 @@ class SpeechCommandsDataset(Dataset):
         self.max_samples = max_samples
         self.skip_anomalies = skip_anomalies
 
-        self.samples: list[dict] = []
-        self.background_noises = self._load_background_noises()
+        if dataset_format not in {"auto", "speech_commands", "kaggle_test"}:
+            raise ValueError(
+                f"Unknown dataset format: {dataset_format}. "
+                "Expected 'auto', 'speech_commands' or 'kaggle_test'."
+            )
+
+        # Automatically detect the dataset structure.
+        if dataset_format == "auto":
+            self.dataset_format = self._detect_dataset_format()
+        else:
+            self.dataset_format = dataset_format
+
+        # Kaggle test datasets contain audio files directly in audio_dir
+        # and have no class labels.
+        self.is_unlabeled = self.dataset_format == "kaggle_test"
+
+        self.samples: list[dict[str, Any]] = []
+        self.background_noises = (
+            self._load_background_noises() if not self.is_unlabeled else []
+        )
 
         self._build_samples(add_silence=add_silence)
+
+    def _detect_dataset_format(self) -> str:
+        """
+        Detect the dataset structure.
+
+        Speech Commands:
+            audio/yes/*.wav
+            audio/no/*.wav
+            audio/_background_noise_/*.wav
+
+        Kaggle test:
+            audio/*.wav
+        """
+        direct_audio_files = list(self.audio_dir.glob("*.wav"))
+
+        class_directories = [
+            path
+            for path in self.audio_dir.iterdir()
+            if path.is_dir() and path.name != "_background_noise_"
+        ]
+
+        if direct_audio_files and not class_directories:
+            return "kaggle_test"
+
+        return "speech_commands"
 
     def _load_background_noises(self) -> list[np.ndarray]:
         noise_dir = self.audio_dir / "_background_noise_"
@@ -72,6 +117,32 @@ class SpeechCommandsDataset(Dataset):
         return noises
 
     def _build_samples(self, add_silence: bool) -> None:
+        # Unlabeled Kaggle test split.
+        # Files are stored directly in audio_dir, without class folders.
+        if self.is_unlabeled:
+            if self.split not in {"test", "all"}:
+                raise ValueError(
+                    f"The detected Kaggle test dataset has no labels. "
+                    f"Split '{self.split}' is not supported. "
+                    "Use split='test' or split='all'."
+                )
+
+            audio_files = sorted(self.audio_dir.glob("*.wav"))
+
+            if self.max_samples is not None:
+                audio_files = audio_files[: self.max_samples]
+
+            self.samples = [
+                {
+                    "path": path,
+                    "label": None,
+                }
+                for path in audio_files
+            ]
+
+            return
+
+        # Original Speech Commands loading logic.
         unknown_files = []
         class_counts = {label: 0 for label in CORE_CLASSES}
 
@@ -124,8 +195,10 @@ class SpeechCommandsDataset(Dataset):
 
         if self.split == "train":
             return not is_validation and not is_test
+
         if self.split == "val":
             return is_validation
+
         if self.split == "test":
             return is_test
 
@@ -212,31 +285,60 @@ class SpeechCommandsDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
+    def __getitem__(self, index: int) -> dict[str, Any]:
         sample = self.samples[index]
 
         audio = self._load_audio(sample["path"])
         audio = self._fix_length(audio)
 
-        return {
+        result = {
             "speech": torch.from_numpy(audio).unsqueeze(0),
-            "target": torch.tensor(
-                sample["label"],
-                dtype=torch.long,
-            ),
         }
+
+        if self.is_unlabeled:
+            # Keep the original filename for Kaggle submission matching.
+            result["path"] = sample["path"].name
+        else:
+            result["target"] = torch.tensor(sample["label"], dtype=torch.long)
+
+        return result
 
 
 class SpeechCommandsDatasetFactory:
     """
-    Factory for creating Speech Commands datasets.
+    Factory for creating Speech Commands or unlabeled Kaggle test datasets.
 
-    Example:
+    Supported structures:
+
+    1. Speech Commands:
+        dataset/
+            audio/
+                yes/*.wav
+                no/*.wav
+                ...
+            validation_list.txt
+            testing_list.txt
+
+    2. Kaggle test:
+        dataset/
+            audio/
+                clip_001.wav
+                clip_002.wav
+                ...
+
+    The format is detected automatically by default.
+
+    Examples:
         factory = SpeechCommandsDatasetFactory("/path/to/dataset")
 
-        train_dataset = factory.create("train")
-        val_dataset = factory.create("val")
-        test_dataset = factory.create("test")
+        train_dataset = factory.train()
+        val_dataset = factory.val()
+        test_dataset = factory.test()
+
+        # Kaggle test returns speech and path, without target.
+        for sample in test_dataset:
+            audio = sample["speech"]
+            filename = sample["path"]
     """
 
     VALID_SPLITS = {"train", "val", "test", "all"}
@@ -245,6 +347,7 @@ class SpeechCommandsDatasetFactory:
         self,
         dataset_dir: str | Path,
         anomalies_file: str | Path | None = None,
+        dataset_format: str = "auto",
     ):
         self.dataset_dir = Path(dataset_dir)
 
@@ -257,11 +360,27 @@ class SpeechCommandsDatasetFactory:
 
         self.anomalies_file = Path(anomalies_file)
 
+        if dataset_format not in {
+            "auto",
+            "speech_commands",
+            "kaggle_test",
+        }:
+            raise ValueError(
+                f"Unknown dataset format: {dataset_format}. "
+                "Expected 'auto', 'speech_commands' or 'kaggle_test'."
+            )
+
         self._validate_paths()
 
         self.validation_files = self._load_split(self.validation_list)
         self.test_files = self._load_split(self.test_list)
         self.anomalies = self._load_anomalies(self.anomalies_file)
+
+        # Detect format once so all factory methods use the same format.
+        if dataset_format == "auto":
+            self.dataset_format = self._detect_dataset_format()
+        else:
+            self.dataset_format = dataset_format
 
     def _validate_paths(self) -> None:
         if not self.dataset_dir.exists():
@@ -269,6 +388,20 @@ class SpeechCommandsDatasetFactory:
 
         if not self.audio_dir.exists():
             raise FileNotFoundError(f"Audio directory not found: {self.audio_dir}")
+
+    def _detect_dataset_format(self) -> str:
+        direct_audio_files = list(self.audio_dir.glob("*.wav"))
+
+        class_directories = [
+            path
+            for path in self.audio_dir.iterdir()
+            if path.is_dir() and path.name != "_background_noise_"
+        ]
+
+        if direct_audio_files and not class_directories:
+            return "kaggle_test"
+
+        return "speech_commands"
 
     @staticmethod
     def _load_split(path: Path) -> set[str]:
@@ -290,9 +423,9 @@ class SpeechCommandsDatasetFactory:
             raise ValueError(f"Anomalies file must contain a JSON list: {path}")
 
         return {
-            Path(path).as_posix()
-            for path in anomalies
-            if isinstance(path, str) and path.strip()
+            Path(item).as_posix()
+            for item in anomalies
+            if isinstance(item, str) and item.strip()
         }
 
     def create(
@@ -317,6 +450,7 @@ class SpeechCommandsDatasetFactory:
             max_samples=max_samples,
             add_silence=add_silence,
             skip_anomalies=skip_anomalies,
+            dataset_format=self.dataset_format,
         )
 
     def train(
