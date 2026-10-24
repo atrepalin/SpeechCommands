@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from model.se.seblock2d import SEBlock2D
+from src.model.se.seblock2d import SEBlock2D
 
 
 class ResBlock2D(nn.Module):

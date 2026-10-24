@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-from model.featureencoder import FeatureEncoder, FeatureEncoderLayer
-from model.featureprojection import FeatureProjection
-from model.positionalembedding import PositionalEmbedding
-from model.transformerencoder import TransformerEncoder
+from src.model.featureencoder import FeatureEncoder, FeatureEncoderLayer
+from src.model.featureprojection import FeatureProjection
+from src.model.positionalembedding import PositionalEmbedding
+from src.model.transformerencoder import TransformerEncoder
 
 
 class Wav2Vec2KWS(nn.Module):

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from model.transformerblock import TransformerBlock
+from src.model.transformerblock import TransformerBlock
 
 
 class TransformerEncoder(nn.Module):

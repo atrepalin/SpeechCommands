@@ -3,11 +3,11 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 
-from model.attentionpooling1d import AttentionPooling1D
-from model.downsample.downsample1d import Downsample1D
-from model.head import ClassificationHead
-from model.res.resblock1d import ResBlock1D
-from model.sincconv1d import SincConv1d
+from src.model.attentionpooling1d import AttentionPooling1D
+from src.model.downsample.downsample1d import Downsample1D
+from src.model.head import ClassificationHead
+from src.model.res.resblock1d import ResBlock1D
+from src.model.sincconv1d import SincConv1d
 
 
 class SincResNetKWS(nn.Module):
